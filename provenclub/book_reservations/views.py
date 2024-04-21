@@ -1,10 +1,11 @@
 from book_reservations.models import Circulation
 from book_reservations.serializers import BookViewSetSerializer
-from dateutil.parser import parser
+from dateutil.parser import parse
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
-from rest_framework.views import ViewSet
+from rest_framework.viewsets import ViewSet
 
 # Create your views here.
 # API Endpoint(s) for handling book checkouts, returns, reservations and reservation fulfillments
@@ -13,6 +14,7 @@ from rest_framework.views import ViewSet
 class BooksViewSet(ViewSet):
     # - Check out/Issue a book when a copy is available in case of a ‘checkout’ request
     serializer_class = BookViewSetSerializer
+    parser_classes = [JSONParser]
 
     @action(methods=["POST"], detail=False)
     def checkout(self, request):
@@ -87,31 +89,33 @@ class BooksViewSet(ViewSet):
 
     @action(methods=["POST"], detail=False)
     def handle_event(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        book_pk = serializer.data.get("book_id")
-        member_pk = serializer.data.get("member_id")
-        event_type = serializer.data.get("eventtype")
-        datetime = parser.parse(serializer.data.get("date"))
+        book_pk = request.data.get("book_id")
+        member_pk = request.data.get("member_id")
+        event_type = request.data.get("eventtype")
+        datetime = parse(timestr=request.data["date"])
 
+        err = None
         if event_type == "checkout":
-            Circulation.checkout_book(
+            err = Circulation.checkout_book(
                 book_id=book_pk, member_id=member_pk, datetime=datetime
             )
 
         elif event_type == "return":
-            Circulation.return_book(
+            err = Circulation.return_book(
                 book_id=book_pk, member_id=member_pk, datetime=datetime
             )
 
         elif event_type == "reserve":
-            Circulation.reserve_book(
+            err = Circulation.reserve_book(
                 book_id=book_pk, member_id=member_pk, datetime=datetime
             )
 
         elif event_type == "fulfill":
-            Circulation.fulfill_book(
+            err = Circulation.fulfill_book(
                 book_id=book_pk, member_id=member_pk, datetime=datetime
             )
+
+        if err is not None:
+            return Response(data={"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(status=status.HTTP_200_OK)
