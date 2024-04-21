@@ -3,13 +3,13 @@ from django.utils import timezone
 
 
 class Reservation(models.Model):
-    member_id = models.ForeignKey(
+    member = models.ForeignKey(
         "book_reservations.Member",
         on_delete=models.CASCADE,
         help_text="The member who reserved the book",
         db_index=True,
     )
-    book_id = models.ForeignKey(
+    book = models.ForeignKey(
         "book_reservations.Book",
         on_delete=models.CASCADE,
         help_text="The reserved book",
@@ -27,7 +27,3 @@ class Reservation(models.Model):
 
     class Meta:
         db_table = "reservations"
-        unique_together = (
-            "member_id",
-            "book_id",
-        )  # One book cannot be reserved more than once by one member

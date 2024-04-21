@@ -76,9 +76,7 @@ class BooksViewSet(ViewSet):
         book_pk = serializer.data.get("book_id")
         member_pk = serializer.data.get("member_id")
 
-        err = Circulation.fulfill_book(
-            book_id=book_pk, member_id=member_pk, circulation_id=None
-        )
+        err = Circulation.fulfill_book(book_id=book_pk, member_id=member_pk)
         if err is not None:
             return Response(data={"error": err}, status=status.HTTP_400_BAD_REQUEST)
 

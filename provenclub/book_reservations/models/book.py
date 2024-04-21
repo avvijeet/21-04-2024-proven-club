@@ -1,5 +1,6 @@
 from book_reservations.models.reservation import Reservation
 from django.db import models
+from django.utils import timezone
 
 
 class Book(models.Model):
@@ -26,7 +27,7 @@ class Book(models.Model):
 
         existing_book_reservations_by_other_members = (
             Reservation.objects.filter(
-                book_id=self.book_id, fulfilled_by__isnull=True
+                book=self.book_id, fulfilled_by__isnull=True
             )  # Unfufilled reservations
             .exclude(member_id=member_id)  # By other members
             .count()
@@ -35,10 +36,16 @@ class Book(models.Model):
         # If number of copies > number of existing book reservations by other members
         return self.number_of_copies > existing_book_reservations_by_other_members
 
-    def fulfill_reservation(self, member_id: int, circulation_id: int, datetime=None):
+    def fulfill_reservation(
+        self, member_id: int, circulation_id: int = None, datetime=None
+    ):
         _ = Reservation.objects.filter(
-            book_id=self.book_id, member_id=member_id, fulfilled_by__isnull=True
-        ).update(fulfilled_by=circulation_id, is_fulfilled=True, fulfilled_at=datetime)
+            book=self.book_id, member=member_id, fulfilled_by__isnull=True
+        ).update(
+            fulfilled_by=circulation_id,
+            is_fulfilled=True,
+            fulfilled_at=datetime or timezone.now(),
+        )
 
     class Meta:
         db_table = "books"

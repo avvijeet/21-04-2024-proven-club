@@ -14,12 +14,12 @@ EVENT_TYPE_CHOICES = (
 
 
 class Circulation(models.Model):
-    member_id = models.ForeignKey(
+    member = models.ForeignKey(
         "book_reservations.Member",
         on_delete=models.CASCADE,
         help_text="The member who reserved the book",
     )
-    book_id = models.ForeignKey(
+    book = models.ForeignKey(
         "book_reservations.Book",
         on_delete=models.CASCADE,
         help_text="The reserved book",
@@ -35,7 +35,10 @@ class Circulation(models.Model):
     @classmethod
     def add_event(cls, member_id: int, book_id: int, status: str, datetime=None) -> int:
         obj = cls(
-            member_id=member_id, book_id=book_id, status=status, datetime=datetime
+            member_id=member_id,
+            book_id=book_id,
+            event_type=status,
+            datetime=datetime or timezone.now(),
         )
         obj.save()
         return obj.id
@@ -55,14 +58,14 @@ class Circulation(models.Model):
         try:
             member: Member = Member.objects.get(pk=member_id)
 
-        except Book.DoesNotExist:
+        except Member.DoesNotExist:
             return f"Member({member_id}) Does Not Exist"
 
-        if book.can_be_checked_out_by_member():
+        if book.can_be_checked_out_by_member(member_id=member_id):
             book.number_of_copies -= 1
             book.save()
             circulation_id = cls.add_event(
-                member_id=member.member_id,
+                member_id=member_id,
                 book_id=book.book_id,
                 status=CHECKOUT,
                 datetime=datetime,
@@ -74,7 +77,7 @@ class Circulation(models.Model):
             )
 
         else:
-            cls.reserve_book(book_id=book_id, member_id=member_id)
+            cls.reserve_book(book_id=book.book_id, member_id=member.member_id)
             return "Book Copy is not available, booked a reservation for this book"
 
     @classmethod
@@ -92,15 +95,21 @@ class Circulation(models.Model):
         try:
             member: Member = Member.objects.get(pk=member_id)
 
-        except Book.DoesNotExist:
+        except Member.DoesNotExist:
             return f"Member({member_id}) Does Not Exist"
 
         book.number_of_copies += 1
         book.save()
-        cls.add_event(
+        circulation_id = cls.add_event(
             member_id=member.member_id,
             book_id=book.book_id,
             status=RETURN,
+            datetime=datetime,
+        )
+
+        book.fulfill_reservation(
+            member_id=member.member_id,
+            circulation_id=circulation_id,
             datetime=datetime,
         )
 
@@ -108,7 +117,7 @@ class Circulation(models.Model):
     @transaction.atomic
     def reserve_book(cls, book_id: int, member_id: int, datetime=None) -> str | None:
         _ = Reservation(
-            member_id=member_id, book_id=book_id, reserved_at=datetime
+            member_id=member_id, book_id=book_id, reserved_at=datetime or timezone.now()
         ).save()
 
     @classmethod
@@ -123,7 +132,7 @@ class Circulation(models.Model):
         try:
             member: Member = Member.objects.get(pk=member_id)
 
-        except Book.DoesNotExist:
+        except Member.DoesNotExist:
             return f"Member({member_id}) Does Not Exist"
 
         book.fulfill_reservation(
